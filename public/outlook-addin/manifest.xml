@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Outlook Desktop Add-in Manifest — Task Tracker
+  IMPORTANT: The <Id> UUID below must never be changed after first deployment.
+             Changing it breaks existing sideloads and requires users to re-install.
+  IMPORTANT: <SourceLocation> and <AppDomain> require HTTPS.
+             Update TASKTRACKER_URL below to your actual HTTPS domain before sideloading.
+             Example: https://tasktracker.example.com
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+
+  <!-- Stable identifier — never change this after first sideload -->
+  <Id>d24ebeee-a18a-4c8e-8a74-71786a9f5738</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Organization Task Tracker</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+
+  <DisplayName DefaultValue="Task Tracker" />
+  <Description DefaultValue="Push calendar appointments directly to the Task Tracker as tasks." />
+
+  <IconUrl DefaultValue="https://TASKTRACKER_URL/favicon.ico" />
+  <HighResolutionIconUrl DefaultValue="https://TASKTRACKER_URL/favicon.ico" />
+  <SupportUrl DefaultValue="https://TASKTRACKER_URL" />
+
+  <AppDomains>
+    <AppDomain>https://TASKTRACKER_URL</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox" />
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.1" />
+    </Sets>
+  </Requirements>
+
+  <FormSettings>
+    <!-- Read mode: viewing an existing saved appointment -->
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://TASKTRACKER_URL/outlook-addin/taskpane.html" />
+        <RequestedHeight>320</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+    <!-- Edit/Compose mode: creating a new appointment (e.g. drag email to calendar) -->
+    <Form xsi:type="ItemEdit">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://TASKTRACKER_URL/outlook-addin/taskpane.html" />
+        <RequestedHeight>320</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <Permissions>ReadWriteItem</Permissions>
+
+  <!-- Activate on calendar appointments in both Read and Edit/Compose modes -->
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Read" />
+    <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Edit" />
+  </Rule>
+
+</OfficeApp>

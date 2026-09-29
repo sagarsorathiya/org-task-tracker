@@ -1,0 +1,230 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════
+   "Clarity" design system (replaces "Organic")
+   Flat blue/gray corporate palette — white surfaces, blue-600 primary,
+   real semantic success/warning/error/info hues. Figtree throughout
+   (headings differentiate by weight, not typeface). Moderate radius,
+   no pill buttons. Source of truth: this file's :root tokens.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    --background: 216 45% 98%;      /* page bg  #f7f9fc */
+    --foreground: 221 39% 11%;      /* text     #111827 */
+    --card: 0 0% 100%;              /* surface  #ffffff */
+    --card-foreground: 221 39% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 39% 11%;
+    --primary: 221 83% 53%;         /* brand blue #2563eb */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 224 76% 48%;   /* hover shade #1d4ed8 */
+    --secondary: 220 14% 96%;       /* neutral-100 tint #f3f4f6 */
+    --secondary-foreground: 221 39% 11%;
+    --muted: 220 14% 96%;           /* neutral-100 #f3f4f6 */
+    --muted-foreground: 215 14% 34%;/* neutral-600 #4b5563 */
+    --accent: 214 100% 97%;         /* blue-50 tint #eff6ff (hover washes) */
+    --accent-foreground: 224 76% 48%;
+    --destructive: 0 84% 60%;       /* error red #ef4444 */
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 84% 39%;         /* #10b981 */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;          /* #f59e0b */
+    --warning-foreground: 221 39% 11%;
+    --info: 189 94% 43%;            /* #06b6d4 */
+    --info-foreground: 0 0% 100%;
+    --border: 220 13% 91%;          /* neutral-200 #e5e7eb */
+    --input: 220 13% 91%;
+    --ring: 221 83% 53%;
+    --radius: 0.5rem;               /* standard corporate radius, not pill */
+    --sidebar-width: 220px;
+    --sidebar-collapsed: 56px;
+    --topbar-height: 48px;
+
+    /* Sidebar rail — white surface, matches card */
+    --rail-bg: 0 0% 100%;
+    --rail-bg-deep: 0 0% 100%;
+    --rail-border: 220 13% 91%;
+    --rail-fg: 221 39% 11%;
+    --rail-muted: 215 14% 34%;
+
+    --shadow-color: 221 39% 11%;    /* matches --foreground; overridden in .dark */
+    --surface-shadow: 0 1px 2px hsl(var(--shadow-color) / 0.10), 0 2px 6px hsl(var(--shadow-color) / 0.06);
+    --surface-shadow-hover: 0 4px 12px hsl(var(--shadow-color) / 0.12);
+
+    --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Dark "Clarity" — same finalized brand/semantic hues (primary, success, warning,
+     destructive, info) as light mode, unchanged; only surface/neutral tokens and
+     shadow color are redefined here for a dark navy-slate chrome. */
+  .dark {
+    --background: 222 47% 7%;       /* page bg   #0a0f1c */
+    --foreground: 210 20% 92%;      /* text      #e2e8f0 */
+    --card: 222 35% 11%;            /* surface   #141b2c */
+    --card-foreground: 210 20% 92%;
+    --popover: 222 35% 11%;
+    --popover-foreground: 210 20% 92%;
+    --secondary: 222 28% 16%;       /* #1e2637 */
+    --secondary-foreground: 210 20% 92%;
+    --muted: 222 28% 15%;           /* #1b2333 */
+    --muted-foreground: 215 16% 65%;/* #93a0b4 */
+    --accent: 221 45% 20%;          /* blue-tinted hover wash */
+    --accent-foreground: 210 20% 96%;
+    --border: 222 20% 20%;          /* #242e42 */
+    --input: 222 20% 22%;           /* #28324a */
+
+    /* Sidebar rail — dark surface, slightly deeper than card for hierarchy */
+    --rail-bg: 222 35% 11%;
+    --rail-bg-deep: 222 40% 9%;
+    --rail-border: 222 20% 20%;
+    --rail-fg: 210 20% 92%;
+    --rail-muted: 215 16% 65%;
+
+    --shadow-color: 0 0% 0%;        /* real black shadows read correctly on a dark surface */
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    @apply text-foreground antialiased;
+    font-family: 'Figtree', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background: hsl(var(--background));
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Figtree', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  ::selection { background: hsl(var(--primary) / 0.22); }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.35); }
+}
+
+/* ── Motion system (unchanged) ─────────────────────────────────────── */
+@layer utilities {
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .animate-rise { animation: rise 0.45s var(--ease-out-soft) backwards; }
+  .page-enter > * { animation: rise 0.4s var(--ease-out-soft) backwards; }
+  .page-enter > *:nth-child(1) { animation-delay: 0ms; }
+  .page-enter > *:nth-child(2) { animation-delay: 50ms; }
+  .page-enter > *:nth-child(3) { animation-delay: 100ms; }
+  .page-enter > *:nth-child(4) { animation-delay: 150ms; }
+  .page-enter > *:nth-child(5) { animation-delay: 200ms; }
+  .page-enter > *:nth-child(6) { animation-delay: 250ms; }
+  .page-enter > *:nth-child(n + 7) { animation-delay: 300ms; }
+
+  .hover-lift {
+    transition: transform 0.2s var(--ease-out-soft), box-shadow 0.2s var(--ease-out-soft);
+  }
+  .hover-lift:hover { transform: translateY(-2px); box-shadow: var(--surface-shadow-hover); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page-enter > *, .animate-rise, .animate-in { animation: none !important; }
+    .hover-lift, .hover-lift:hover { transition: none; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+}
+
+@layer utilities {
+  /* Priority left-border accents — real semantic hues now available */
+  .priority-high { border-left: 3px solid hsl(var(--destructive)); }
+  .priority-medium { border-left: 3px solid hsl(var(--warning)); }
+  .priority-low { border-left: 3px solid hsl(var(--border)); }
+
+  /* ── Surfaces — class names kept from the old system so consumer files don't change ── */
+  .glass-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--surface-shadow);
+    transition: box-shadow 0.25s var(--ease-out-soft), border-color 0.25s var(--ease-out-soft);
+  }
+  .glass-card:hover { border-color: hsl(var(--primary) / 0.3); }
+
+  /* Sidebar rail — white surface */
+  .glass-panel {
+    background: hsl(var(--rail-bg));
+    border-color: hsl(var(--rail-border));
+  }
+
+  /* Topbar chrome — keep the one intentional blur surface */
+  .topbar-panel {
+    background: hsl(var(--background) / 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: hsl(var(--border));
+  }
+
+  /* Subtle surface — table headers, filter bars, inner panels */
+  .glass-subtle {
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+  }
+
+  /* Primary action button — solid blue fill */
+  .btn-gradient-primary {
+    background: hsl(var(--primary));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.18), 0 1px 2px hsl(var(--shadow-color) / 0.18);
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-gradient-primary:hover { background: hsl(var(--primary-hover)); }
+  .btn-gradient-primary:active { filter: brightness(0.92); }
+
+  /* Active sidebar item — blue tint pill */
+  .sidebar-active {
+    background: hsl(var(--primary) / 0.12);
+    color: hsl(var(--primary));
+    box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.22);
+  }
+
+  /* Inactive sidebar items */
+  .sidebar-item { color: hsl(var(--rail-fg) / 0.72); }
+  .sidebar-item:hover { background: hsl(var(--primary) / 0.08); color: hsl(var(--rail-fg)); }
+
+  /* Table row hover — blue indicator on the left edge */
+  .row-accent:hover { box-shadow: inset 2px 0 0 hsl(var(--primary) / 0.7); }
+
+  .rail-border { border-color: hsl(var(--rail-border)); }
+  .rail-text { color: hsl(var(--rail-fg)); }
+  .rail-muted { color: hsl(var(--rail-muted)); }
+
+  /* Capsule mini-charts — sparkline/trend bars */
+  .capsule-bar-hatch {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      hsl(var(--muted-foreground) / 0.18) 0px,
+      hsl(var(--muted-foreground) / 0.18) 2px,
+      transparent 2px,
+      transparent 6px
+    );
+    background-color: hsl(var(--muted) / 0.6);
+  }
+
+  .avatar-stack > * { box-shadow: 0 0 0 2px hsl(var(--card)); }
+}

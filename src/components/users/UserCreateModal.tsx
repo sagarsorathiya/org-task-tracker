@@ -1,0 +1,554 @@
+'use client';
+
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Eye, EyeOff } from 'lucide-react';
+import { ROLE_OPTIONS } from '@/constants';
+import type { Company, Department, Designation, DeptCompanyMap, DesigCompanyHeadMap } from '@/types';
+
+const schema = z.object({
+  username: z
+    .string()
+    .min(1, 'Username is required')
+    .max(100)
+    .regex(/^[a-zA-Z0-9._\-@]+$/, 'Only letters, digits, dots, underscores, hyphens, or @'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string(),
+  displayName: z.string().min(1, 'Display name is required').max(200),
+  email: z.string().email('Invalid email').or(z.literal('')),
+  mobileNumber: z.string().max(20).optional().or(z.literal('')),
+  role: z.enum(['admin', 'manager', 'user']),
+  companyId: z.string().optional(),
+  deptId: z.string().optional(),
+  desigId: z.string().optional(),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+type FormValues = z.infer<typeof schema>;
+
+type EditableScopeAssignment = {
+  id: string;
+  companyId: string;
+  deptId: string;
+  desigId: string;
+  responsibility: string;
+  responsibilityType: string;
+  isPrimary: boolean;
+  isActive: boolean;
+};
+
+const RESPONSIBILITY_OPTIONS = [
+  { value: 'department_head', label: 'Department Head' },
+  { value: 'company_head', label: 'Company Head' },
+  { value: 'ceo', label: 'CEO' },
+  { value: 'executive_director', label: 'Executive Director' },
+  { value: '__custom__', label: 'Custom' },
+] as const;
+
+interface UserCreateModalProps {
+  open: boolean;
+  companies: Company[];
+  departments: Department[];
+  designations: Designation[];
+  deptCompanyMap: DeptCompanyMap[];
+  desigCompanyHeadMap: DesigCompanyHeadMap[];
+  saving: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (values: FormValues & {
+    scopeAssignments?: Array<{
+      companyId: string;
+      deptId?: string;
+      desigId?: string;
+      responsibilityType?: string;
+      isPrimary?: boolean;
+      isActive?: boolean;
+    }>;
+  }) => void;
+}
+
+export function UserCreateModal({
+  open,
+  companies,
+  departments,
+  designations,
+  deptCompanyMap,
+  desigCompanyHeadMap,
+  saving,
+  onOpenChange,
+  onSave,
+}: UserCreateModalProps) {
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirm, setShowConfirm] = React.useState(false);
+  const [assignments, setAssignments] = React.useState<EditableScopeAssignment[]>([
+    { id: 'primary', companyId: '', deptId: '', desigId: '', responsibility: '', responsibilityType: '', isPrimary: true, isActive: true },
+  ]);
+  const [assignmentError, setAssignmentError] = React.useState('');
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      username: '',
+      password: '',
+      confirmPassword: '',
+      displayName: '',
+      email: '',
+      mobileNumber: '',
+      role: 'user',
+      companyId: '',
+      deptId: '',
+      desigId: '',
+    },
+  });
+
+  const isAdminSelected = form.watch('role') === 'admin';
+  const topLevelCompanyId = form.watch('companyId') || '';
+  const topLevelDesigId = form.watch('desigId') || '';
+
+  const normalizeResponsibility = (value?: string) => (value || '').trim().toLowerCase();
+  const hasCompanyHeadDesignationMap = React.useCallback((companyId?: string, desigId?: string) => {
+    if (!companyId || !desigId) return false;
+    return desigCompanyHeadMap.some((m) => String(m.company_id) === companyId && String(m.desig_id) === desigId);
+  }, [desigCompanyHeadMap]);
+
+  const isCompanyHeadByDesignation = hasCompanyHeadDesignationMap(topLevelCompanyId, topLevelDesigId);
+  const isCompanyHeadPrimary = React.useMemo(() => {
+    const primary = assignments.find((a) => a.isPrimary && a.isActive);
+    if (!primary) return false;
+    const resolved = primary.responsibility === '__custom__' ? primary.responsibilityType : primary.responsibility;
+    return normalizeResponsibility(resolved) === 'company_head' || hasCompanyHeadDesignationMap(primary.companyId, primary.desigId);
+  }, [assignments, hasCompanyHeadDesignationMap]);
+
+  React.useEffect(() => {
+    if (!isCompanyHeadPrimary && !isCompanyHeadByDesignation) return;
+    if (form.getValues('deptId')) form.setValue('deptId', '');
+  }, [isCompanyHeadPrimary, isCompanyHeadByDesignation, form]);
+
+  // Reset form when modal closes
+  React.useEffect(() => {
+    if (!open) {
+      form.reset();
+      setAssignments([
+        { id: 'primary', companyId: '', deptId: '', desigId: '', responsibility: '', responsibilityType: '', isPrimary: true, isActive: true },
+      ]);
+      setAssignmentError('');
+      setShowPassword(false);
+      setShowConfirm(false);
+    }
+  }, [open, form]);
+
+  const addAssignment = () => {
+    setAssignmentError('');
+    setAssignments((prev) => [
+      ...prev,
+      {
+        id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        companyId: '', deptId: '', desigId: '', responsibility: '', responsibilityType: '',
+        isPrimary: prev.length === 0, isActive: true,
+      },
+    ]);
+  };
+
+  const removeAssignment = (id: string) => {
+    setAssignmentError('');
+    setAssignments((prev) => {
+      const filtered = prev.filter((a) => a.id !== id);
+      if (filtered.length > 0 && !filtered.some((a) => a.isPrimary)) filtered[0].isPrimary = true;
+      return filtered;
+    });
+  };
+
+  const updateAssignment = (id: string, patch: Partial<EditableScopeAssignment>) => {
+    setAssignmentError('');
+    setAssignments((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  };
+
+  const setPrimaryAssignment = (id: string) => {
+    setAssignmentError('');
+    setAssignments((prev) => prev.map((a) => ({ ...a, isPrimary: a.id === id })));
+  };
+
+  const submit = form.handleSubmit((values) => {
+    if (values.role === 'admin') {
+      setAssignmentError('');
+      onSave({ ...values, companyId: '', deptId: '', desigId: '', scopeAssignments: [] });
+      return;
+    }
+
+    const scopeAssignments = assignments
+      .filter((a) => !!a.companyId)
+      .map((a) => {
+        const responsibilityType = (a.responsibility === '__custom__' ? a.responsibilityType.trim() : a.responsibility) || undefined;
+        const isCompanyHead = normalizeResponsibility(responsibilityType) === 'company_head';
+        return {
+          companyId: a.companyId,
+          deptId: isCompanyHead ? undefined : (a.deptId || undefined),
+          desigId: a.desigId || undefined,
+          responsibilityType,
+          isPrimary: a.isPrimary,
+          isActive: a.isActive,
+        };
+      });
+
+    const primaryIndex = scopeAssignments.findIndex((a) => a.isPrimary && a.isActive !== false);
+    if (primaryIndex >= 0) {
+      scopeAssignments[primaryIndex] = {
+        ...scopeAssignments[primaryIndex],
+        companyId: values.companyId || scopeAssignments[primaryIndex].companyId,
+        deptId: values.deptId ? values.deptId : scopeAssignments[primaryIndex].deptId,
+        desigId: values.desigId ? values.desigId : scopeAssignments[primaryIndex].desigId,
+      };
+    }
+
+    if (scopeAssignments.length === 0) {
+      setAssignmentError('Add at least one assignment with a company.');
+      return;
+    }
+
+    const activeAssignments = scopeAssignments.filter((a) => a.isActive !== false);
+    if (activeAssignments.length === 0) {
+      setAssignmentError('At least one assignment must be active.');
+      return;
+    }
+
+    if (activeAssignments.filter((a) => a.isPrimary).length !== 1) {
+      setAssignmentError('Exactly one active assignment must be marked Primary.');
+      return;
+    }
+
+    const mappedPairs = new Set(deptCompanyMap.map((m) => `${m.company_id}:${m.dept_id}`));
+    if (scopeAssignments.some((a) => a.deptId && !mappedPairs.has(`${a.companyId}:${a.deptId}`))) {
+      setAssignmentError('One or more rows have an invalid company-department combination.');
+      return;
+    }
+
+    setAssignmentError('');
+    onSave({ ...values, scopeAssignments });
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogHeader className="shrink-0">
+          <DialogTitle>Create Manual User</DialogTitle>
+          <DialogDescription>
+            Create a local user account that logs in with a username and password (not LDAP).
+          </DialogDescription>
+        </DialogHeader>
+
+        <form className="flex-1 overflow-y-auto space-y-4 py-2 pr-3" onSubmit={submit}>
+          {/* Username */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Username</label>
+            <Input {...form.register('username')} placeholder="e.g. john.doe" autoComplete="off" />
+            {form.formState.errors.username && (
+              <p className="text-xs text-destructive">{form.formState.errors.username.message}</p>
+            )}
+          </div>
+
+          {/* Display Name */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Display Name</label>
+            <Input {...form.register('displayName')} placeholder="e.g. John Doe" />
+            {form.formState.errors.displayName && (
+              <p className="text-xs text-destructive">{form.formState.errors.displayName.message}</p>
+            )}
+          </div>
+
+          {/* Password fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Password</label>
+              <div className="relative">
+                <Input
+                  {...form.register('password')}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {form.formState.errors.password && (
+                <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Confirm Password</label>
+              <div className="relative">
+                <Input
+                  {...form.register('confirmPassword')}
+                  type={showConfirm ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  tabIndex={-1}
+                >
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {form.formState.errors.confirmPassword && (
+                <p className="text-xs text-destructive">{form.formState.errors.confirmPassword.message}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Email + Mobile */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input {...form.register('email')} type="email" />
+              {form.formState.errors.email && (
+                <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mobile Number</label>
+              <Input {...form.register('mobileNumber')} />
+            </div>
+          </div>
+
+          {/* Role + Company (side by side unless admin) */}
+          {!isAdminSelected && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">System Role</label>
+                <Select value={form.watch('role')} onValueChange={(v) => form.setValue('role', v as FormValues['role'])}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{ROLE_OPTIONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">System Role controls app-level permissions.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Company</label>
+                <Select value={form.watch('companyId') || ''} onValueChange={(v) => form.setValue('companyId', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.code}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {isAdminSelected && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">System Role</label>
+              <Select value={form.watch('role')} onValueChange={(v) => form.setValue('role', v as FormValues['role'])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{ROLE_OPTIONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Admin is global and does not carry company, department, or designation scope.</p>
+            </div>
+          )}
+
+          {!isAdminSelected && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Designation</label>
+                  <Select
+                    value={form.watch('desigId') || ''}
+                    onValueChange={(v) => {
+                      form.setValue('desigId', v);
+                      if (hasCompanyHeadDesignationMap(form.getValues('companyId') || '', v)) {
+                        form.setValue('deptId', '');
+                      }
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>{designations.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {!isCompanyHeadPrimary && !isCompanyHeadByDesignation && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Department</label>
+                    <Select value={form.watch('deptId') || '__none__'} onValueChange={(v) => form.setValue('deptId', v === '__none__' ? '' : v)}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">All Departments</SelectItem>
+                        {departments.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Scope assignments */}
+              <div className="space-y-3 rounded-xl border border-border bg-muted p-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-base font-semibold">Multi-Company / Multi-Department Assignments</label>
+                  <Button type="button" variant="outline" size="sm" onClick={addAssignment}>Add Assignment</Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Map additional charges (CEO, department head, etc.) across companies/departments.
+                </p>
+
+                {assignmentError && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {assignmentError}
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {assignments.map((assignment, index) => {
+                    const mappedDeptIds = new Set(
+                      deptCompanyMap.filter((m) => String(m.company_id) === assignment.companyId).map((m) => String(m.dept_id))
+                    );
+                    const allowedDepartments = assignment.companyId ? departments.filter((d) => mappedDeptIds.has(String(d.id))) : departments;
+                    const hasInvalidDept = !!assignment.companyId && !!assignment.deptId && !mappedDeptIds.has(assignment.deptId);
+                    const resolvedRowResponsibility = assignment.responsibility === '__custom__' ? assignment.responsibilityType : assignment.responsibility;
+                    const isCompanyHeadRow = normalizeResponsibility(resolvedRowResponsibility) === 'company_head'
+                      || hasCompanyHeadDesignationMap(assignment.companyId, assignment.desigId);
+
+                    return (
+                      <div key={assignment.id} className="space-y-3 rounded-lg border border-border/60 bg-background p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assignment {index + 1}</p>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeAssignment(assignment.id)} disabled={assignments.length <= 1 && index === 0}>
+                            Remove
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Company</label>
+                            <Select value={assignment.companyId || '__none__'} onValueChange={(v) => updateAssignment(assignment.id, { companyId: v === '__none__' ? '' : v })}>
+                              <SelectTrigger><SelectValue placeholder="Select Company" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Select Company</SelectItem>
+                                {companies.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.code}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Designation</label>
+                            <Select
+                              value={assignment.desigId || '__none__'}
+                              onValueChange={(v) => {
+                                const nextDesigId = v === '__none__' ? '' : v;
+                                updateAssignment(assignment.id, {
+                                  desigId: nextDesigId,
+                                  deptId: hasCompanyHeadDesignationMap(assignment.companyId, nextDesigId) ? '' : assignment.deptId,
+                                });
+                              }}
+                            >
+                              <SelectTrigger><SelectValue placeholder="Designation" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">No Designation</SelectItem>
+                                {designations.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Department</label>
+                            <Select
+                              value={assignment.deptId || '__all__'}
+                              onValueChange={(v) => updateAssignment(assignment.id, { deptId: v === '__all__' ? '' : v })}
+                              disabled={isCompanyHeadRow}
+                            >
+                              <SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__all__">All Departments</SelectItem>
+                                {allowedDepartments.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            {isCompanyHeadRow && <p className="text-xs text-muted-foreground">Company Head is company-wide.</p>}
+                            {!isCompanyHeadRow && hasInvalidDept && <p className="text-xs text-destructive">Selected department is not mapped to this company.</p>}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                          <div className="space-y-1.5 md:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">Responsibility</label>
+                            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                              <Select
+                                value={assignment.responsibility || '__none__'}
+                                onValueChange={(v) => {
+                                  const next = v === '__none__' ? '' : v;
+                                  updateAssignment(assignment.id, { responsibility: next, deptId: next === 'company_head' ? '' : assignment.deptId });
+                                }}
+                              >
+                                <SelectTrigger><SelectValue placeholder="Select responsibility" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">Select responsibility</SelectItem>
+                                  {RESPONSIBILITY_OPTIONS.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {assignment.responsibility === '__custom__' && (
+                                <Input
+                                  placeholder="Custom responsibility"
+                                  value={assignment.responsibilityType}
+                                  onChange={(e) => updateAssignment(assignment.id, { responsibilityType: e.target.value })}
+                                />
+                              )}
+                            </div>
+                            {assignment.responsibility === 'department_head' && !assignment.deptId && (
+                              <p className="text-xs text-destructive">Department Head requires a specific department.</p>
+                            )}
+                          </div>
+
+                          <div className="flex items-end gap-4 pb-2">
+                            <label className="inline-flex items-center gap-2 text-sm">
+                              <Checkbox
+                                checked={assignment.isActive}
+                                onCheckedChange={(checked) => {
+                                  const isActive = !!checked;
+                                  updateAssignment(assignment.id, { isActive });
+                                  if (!isActive && assignment.isPrimary) {
+                                    const next = assignments.find((a) => a.id !== assignment.id && a.isActive);
+                                    if (next) setPrimaryAssignment(next.id);
+                                  }
+                                }}
+                              />
+                              Active
+                            </label>
+                            <label className="inline-flex items-center gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="primary-assignment-create"
+                                checked={assignment.isPrimary}
+                                onChange={() => {
+                                  if (!assignment.isActive) updateAssignment(assignment.id, { isActive: true });
+                                  setPrimaryAssignment(assignment.id);
+                                }}
+                              />
+                              Primary
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create User'}</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

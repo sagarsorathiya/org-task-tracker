@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Tracker</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: hsl(239 84% 67%);
+      --primary-fg: hsl(0 0% 100%);
+      --bg: hsl(224 71% 4%);
+      --fg: hsl(213 31% 91%);
+      --muted: hsl(215 16% 57%);
+      --card: hsl(222 47% 8%);
+      --border: hsl(216 34% 17%);
+      --emerald: hsl(158 64% 52%);
+      --amber: hsl(38 92% 50%);
+      --rose: hsl(0 84% 60%);
+      --radius: 12px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font);
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .pane { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* Header */
+    .header {
+      display: flex; align-items: center; gap: 8px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .header-icon {
+      width: 26px; height: 26px; border-radius: 8px;
+      background: color-mix(in srgb, var(--primary) 20%, transparent);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .header-title { font-size: 14px; font-weight: 600; }
+
+    /* Event card */
+    .event-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .event-label {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted);
+    }
+    .event-title { font-size: 13px; font-weight: 500; line-height: 1.3; }
+    .event-time {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--muted);
+    }
+    .event-body {
+      font-size: 11px; color: var(--muted); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+    /* Buttons */
+    .btn {
+      width: 100%; padding: 9px 14px; border-radius: var(--radius); border: none;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity .15s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: var(--primary-fg); }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-ghost {
+      background: transparent; color: var(--muted);
+      font-size: 11px; font-weight: 400; padding: 5px;
+    }
+    .btn-ghost:hover:not(:disabled) { color: var(--fg); }
+
+    /* Token input */
+    .token-desc { font-size: 11px; color: var(--muted); line-height: 1.6; }
+    .token-desc strong { color: var(--fg); }
+    input[type="password"] {
+      width: 100%; padding: 8px 12px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--fg); font-size: 12px; font-family: var(--font);
+      outline: none;
+    }
+    input[type="password"]:focus { border-color: var(--primary); }
+
+    /* Status banners */
+    .banner {
+      border-radius: var(--radius); padding: 10px 12px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .banner-title { font-size: 12px; font-weight: 600; }
+    .banner-body { font-size: 11px; color: var(--muted); }
+    .banner-success { border: 1px solid color-mix(in srgb, var(--emerald) 30%, transparent); background: color-mix(in srgb, var(--emerald) 10%, transparent); }
+    .banner-success .banner-title { color: var(--emerald); }
+    .banner-warn { border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent); background: color-mix(in srgb, var(--amber) 10%, transparent); }
+    .banner-warn .banner-title { color: var(--amber); }
+    .banner-error { border: 1px solid color-mix(in srgb, var(--rose) 30%, transparent); background: color-mix(in srgb, var(--rose) 10%, transparent); }
+    .banner-error .banner-title { color: var(--rose); }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid currentColor; border-top-color: transparent;
+      animation: spin .6s linear infinite; display: inline-block;
+    }
+
+    /* Loading screen */
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 8px; min-height: 160px;
+    }
+    .loading-text { font-size: 11px; color: var(--muted); }
+
+    /* Link */
+    a { color: var(--primary); font-size: 11px; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="pane">
+
+    <!-- Header (always visible) -->
+    <div class="header">
+      <div class="header-icon">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="hsl(239 84% 67%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </div>
+      <span class="header-title">Task Tracker</span>
+    </div>
+
+    <!-- Loading state -->
+    <div id="view-loading" class="loading">
+      <div class="spinner" style="color:var(--primary)"></div>
+      <span class="loading-text">Loading…</span>
+    </div>
+
+    <!-- Token setup -->
+    <div id="view-token" class="hidden" style="display:flex;flex-direction:column;gap:10px;">
+      <p class="token-desc">
+        Paste your add-in token to connect this pane to your account.
+        Get it from <strong>Task Tracker → Config → Integrations</strong>.
+      </p>
+      <input type="password" id="token-input" placeholder="Paste your token here…" />
+      <button class="btn btn-primary" id="btn-save-token">Save Token</button>
+    </div>
+
+    <!-- Ready state -->
+    <div id="view-ready" class="hidden" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="event-card">
+        <span class="event-label">Appointment</span>
+        <div class="event-title" id="ev-subject">—</div>
+        <div class="event-time">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span id="ev-time">—</span>
+        </div>
+        <div class="event-body" id="ev-body"></div>
+      </div>
+      <button class="btn btn-primary" id="btn-push">Push to Task Tracker</button>
+      <button class="btn btn-ghost" id="btn-reset-ready">Reset token</button>
+    </div>
+
+    <!-- Pushing state -->
+    <div id="view-pushing" class="hidden" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="event-card">
+        <span class="event-label">Appointment</span>
+        <div class="event-title" id="ev-subject-pushing">—</div>
+      </div>
+      <button class="btn btn-primary" disabled>
+        <span class="spinner"></span> Creating task…
+      </button>
+    </div>
+
+    <!-- Success state -->
+    <div id="view-success" class="hidden" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="banner banner-success">
+        <span class="banner-title">Task created!</span>
+        <span class="banner-body">Added as Task #<span id="success-task-id"></span>.</span>
+        <a id="success-link" href="#" target="_blank">View in Task Tracker →</a>
+      </div>
+      <button class="btn btn-ghost" id="btn-push-another">Push another event</button>
+    </div>
+
+    <!-- Already imported -->
+    <div id="view-duplicate" class="hidden">
+      <div class="banner banner-warn">
+        <span class="banner-title">Already imported</span>
+        <span class="banner-body">This event was already added as Task #<span id="dup-task-id"></span>.</span>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div id="view-error" class="hidden" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="banner banner-error">
+        <span class="banner-title">Error</span>
+        <span class="banner-body" id="error-msg"></span>
+      </div>
+      <button class="btn btn-ghost" id="btn-retry">Try again</button>
+      <button class="btn btn-ghost" id="btn-reset-error">Reset token</button>
+    </div>
+
+  </div>
+
+  <script>
+    const TOKEN_KEY = 'org_tracker_addin_token';
+    let currentEvent = null;
+
+    // ── View helpers ──────────────────────────────────────────────────────────
+    const views = ['loading','token','ready','pushing','success','duplicate','error'];
+    function show(name) {
+      views.forEach(v => {
+        const el = document.getElementById('view-' + v);
+        if (el) el.classList.toggle('hidden', v !== name);
+      });
+    }
+
+    function showError(msg) {
+      document.getElementById('error-msg').textContent = msg;
+      show('error');
+    }
+
+    // ── Token helpers ─────────────────────────────────────────────────────────
+    function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+    function saveToken(t) { localStorage.setItem(TOKEN_KEY, t.trim()); }
+    function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
+    // ── Format helpers ────────────────────────────────────────────────────────
+    function fmtDateTime(iso) {
+      try {
+        return new Date(iso).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      } catch { return iso; }
+    }
+    function fmtTime(iso) {
+      try {
+        return new Date(iso).toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+      } catch { return iso; }
+    }
+
+    // ── Read Outlook item ─────────────────────────────────────────────────────
+    function readItem(item) {
+      const getSubject = (cb) => {
+        if (typeof item.subject === 'string') cb(item.subject);
+        else item.subject.getAsync(r => cb(r.value || ''));
+      };
+
+      getSubject(subject => {
+        item.body.getAsync('text', bodyRes => {
+          item.start.getAsync(startRes => {
+            item.end.getAsync(endRes => {
+              const startIso = startRes.value instanceof Date
+                ? startRes.value.toISOString()
+                : new Date(startRes.value).toISOString();
+              const endIso = endRes.value instanceof Date
+                ? endRes.value.toISOString()
+                : new Date(endRes.value).toISOString();
+              const bodyText = (bodyRes.value || '').replace(/\s+/g,' ').trim().slice(0,1000);
+
+              currentEvent = {
+                outlookItemId: item.itemId || ('compose-' + subject + '-' + startIso),
+                subject: subject.trim() || '(No subject)',
+                body: bodyText,
+                startDateTime: startIso,
+                endDateTime: endIso,
+                isAllDay: false,
+              };
+
+              // Populate ready view
+              document.getElementById('ev-subject').textContent = currentEvent.subject;
+              document.getElementById('ev-subject-pushing').textContent = currentEvent.subject;
+              const timeStr = fmtDateTime(startIso) + (endIso !== startIso ? ' → ' + fmtTime(endIso) : '');
+              document.getElementById('ev-time').textContent = timeStr;
+              if (bodyText) document.getElementById('ev-body').textContent = bodyText;
+
+              show(getToken() ? 'ready' : 'token');
+            });
+          });
+        });
+      });
+    }
+
+    // ── Push to task tracker ──────────────────────────────────────────────────
+    async function pushTask() {
+      if (!currentEvent) return;
+      show('pushing');
+      try {
+        const res = await fetch('/api/integrations/addin/import-event', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + getToken(),
+          },
+          body: JSON.stringify(currentEvent),
+        });
+        const json = await res.json();
+
+        if (res.status === 401) {
+          showError('Invalid token. Regenerate it from the Task Tracker settings page.');
+          return;
+        }
+        if (!json.success) {
+          showError(json.error || 'Something went wrong.');
+          return;
+        }
+
+        const taskId = json.data.taskId;
+        if (json.data.alreadyImported) {
+          document.getElementById('dup-task-id').textContent = taskId;
+          show('duplicate');
+        } else {
+          document.getElementById('success-task-id').textContent = taskId;
+          const origin = window.location.origin;
+          document.getElementById('success-link').href = origin + '/tasks';
+          show('success');
+        }
+      } catch {
+        showError('Network error. Check your connection and try again.');
+      }
+    }
+
+    // ── Wire buttons ──────────────────────────────────────────────────────────
+    document.getElementById('btn-save-token').addEventListener('click', () => {
+      const val = document.getElementById('token-input').value.trim();
+      if (!val) return;
+      saveToken(val);
+      document.getElementById('token-input').value = '';
+      show(currentEvent ? 'ready' : 'loading');
+    });
+    document.getElementById('token-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('btn-save-token').click();
+    });
+    document.getElementById('btn-push').addEventListener('click', pushTask);
+    document.getElementById('btn-push-another').addEventListener('click', () => show('ready'));
+    document.getElementById('btn-retry').addEventListener('click', () => show(currentEvent ? 'ready' : 'token'));
+    document.getElementById('btn-reset-ready').addEventListener('click', () => { clearToken(); show('token'); });
+    document.getElementById('btn-reset-error').addEventListener('click', () => { clearToken(); show('token'); });
+
+    // ── Office.js initialisation ──────────────────────────────────────────────
+    Office.onReady(() => {
+      const item = Office.context.mailbox.item;
+      if (!item) {
+        showError('No calendar item found. Open an appointment first.');
+        return;
+      }
+      readItem(item);
+    });
+  </script>
+</body>
+</html>
