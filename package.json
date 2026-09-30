@@ -2,6 +2,7 @@
   "name": "organization-activity-tracker",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Organization Activity Tracker — Internal task/activity management portal",
   "scripts": {
     "dev": "node server.js",

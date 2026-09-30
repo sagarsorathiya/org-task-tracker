@@ -296,4 +296,4 @@ Important notes:
 
 ## License
 
-Internal use only — Organization.
+Released under the [MIT License](LICENSE).
